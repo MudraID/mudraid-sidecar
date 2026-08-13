@@ -1,0 +1,218 @@
+name: Publish
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Publishes `@mudraid/sidecar` to npm — sibling of the adapter-node publish.yml
+# and npm counterpart of the PyPI publish.yml pattern shipped with the two
+# Python packages. Same shape throughout: lives in the monorepo, mirrored into
+# the public repository alongside the package; dry-run by default; the upload
+# sits behind the `npm-publish` environment approval; a requested publish with
+# no credential is a loud refusal, never a skip; and the support-matrix row
+# flips only on a recorded upload receipt, never on this run going green.
+#
+# TWO CHANNELS, ONE VERSION. The support matrix lists this package on the
+# `oci` channel — the Dockerfile image built by adapter-release.yml is the
+# primary distribution — and this workflow governs the npm tarball, the
+# source-run form. Both carry the same package.json version; neither channel's
+# row moves except on its own receipt.
+#
+# KNOWN RELEASE BLOCKER, STATED RATHER THAN PAPERED OVER. The sidecar consumes
+# `@mudraid/adapter-node` by RELATIVE SOURCE alias (vitest.config.ts and
+# tsconfig `paths` point at ../mudraid-adapter-node/src) and package.json
+# declares NO dependency on it. That wiring resolves only in the monorepo
+# layout: in a public mirror of this package alone, typecheck and the test
+# suite fail because the sibling directory is not there — and that failure is
+# a true statement, not a flake. Releasing to npm requires, in one reviewed
+# commit: publish @mudraid/adapter-node first, declare it as a real
+# dependency here, and retire the source aliases. Until then the preflight
+# below refuses a real publish over the undeclared import, by name.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Actually upload to npm (requires the npm-publish environment approval and NPM_TOKEN). Anything else is a dry run."
+        required: false
+        default: false
+        type: boolean
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # There is no compile step — the sidecar runs from TypeScript source via
+      # tsx — so "build" here is the strictest static statement available
+      # (typecheck) plus packing the artifact every later job inspects.
+      - name: Typecheck and pack
+        run: |
+          npm ci
+          npm run typecheck
+          mkdir -p dist-tarball
+          npm pack --pack-destination dist-tarball
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-tarball
+          path: dist-tarball/
+
+  checks:
+    name: Tarball contents and dependency audit
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-tarball
+          path: dist-tarball/
+
+      # What is IN the artifact, which no test can tell you. For this package
+      # the expensive absence would be a boot-path module (`main` names source
+      # files directly), and the expensive presence would be the Dockerfile —
+      # the OCI channel's recipe does not belong inside the npm artifact — or
+      # anything credential-shaped. Node standard library only, nothing
+      # outside this package directory, because this runs in the mirror too.
+      - name: Inspect what the tarball actually contains
+        run: node .github/inspect_tarball.mjs contents dist-tarball
+
+      # Production dependencies only — what a customer's install resolves, not
+      # the dev toolchain. (Currently zero runtime dependencies; the step is
+      # the statement that this stays audited, not assumed.)
+      - name: Audit the shipped dependency set
+        run: npm audit --omit=dev --audit-level=low
+
+  test:
+    name: Test on Node ${{ matrix.node-version }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Every current release line `engines: node>=20` admits, exercised;
+      # fail-fast off so a single-version break reports as one.
+      matrix:
+        node-version: ['20', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # The suite includes the packaging guards (test/packaging.test.ts) and
+      # the corpus-no-bypass conformance tests. In the monorepo layout this
+      # passes; in a public mirror it fails on the unresolvable
+      # `@mudraid/adapter-node` source alias — deliberately not worked around,
+      # because a sidecar whose decision core cannot be resolved from the
+      # published tree has no business publishing (see header).
+      #
+      # There is intentionally NO install-the-tarball import smoke here yet:
+      # the artifact's `main` is TypeScript source importing an undeclared
+      # dependency, so the smoke test has nothing truthful to exercise until
+      # the dependency-wiring release act lands. The preflight refuses a real
+      # publish on exactly that ground; adding the smoke test belongs to the
+      # same commit that fixes the wiring.
+      - name: Run the suite
+        run: |
+          npm ci
+          npm test
+
+      - name: Generate SBOM
+        if: matrix.node-version == '20'
+        run: npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-file sbom.json
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.node-version == '20'
+        with:
+          name: sbom
+          path: sbom.json
+
+  publish:
+    name: Publish (approval required)
+    needs: [test, checks]
+    runs-on: ubuntu-latest
+    # The approval gate, mirroring the Python packages' `pypi-publish`
+    # environment. npm blocks re-publishing a version number even after
+    # unpublish, so nothing reaches the registry without a human approving
+    # this environment.
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write # `npm publish --provenance` signs over the Actions OIDC identity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-tarball
+          path: dist-tarball/
+
+      # `release: published` reaches here with no inputs, so every gate below
+      # requires the explicit choice. With publish unset this step reports
+      # what a real run would refuse over — today that list includes the
+      # private flag, the 0.0.0 placeholder and the undeclared decision-core
+      # dependency — and refuses nothing.
+      - name: Preflight the release candidate
+        env:
+          PUBLISH_INTENT: ${{ inputs.publish == true }}
+        run: node .github/inspect_tarball.mjs preflight dist-tarball
+
+      # ABSENCE OF THE CREDENTIAL IS A REFUSAL, NOT A SKIP. A green run with a
+      # quietly skipped upload reads as a release that never happened. The
+      # secret is only ever read into the environment — never echoed, never
+      # written to a file.
+      - name: Refuse a requested publish without a credential
+        if: inputs.publish == true
+        env:
+          NPM_TOKEN_PRESENT: ${{ secrets.NPM_TOKEN != '' }}
+        run: |
+          if [ "${NPM_TOKEN_PRESENT}" != "true" ]; then
+            echo "::error::publish=true was requested but the NPM_TOKEN secret is not configured in the npm-publish environment. This is a refusal, not a skip: provision a granular automation token scoped to @mudraid/sidecar (or npm OIDC trusted publishing) and re-run. Nothing was published."
+            exit 1
+          fi
+
+      - name: Dry run (default)
+        if: inputs.publish != true
+        run: |
+          echo "Dry run: nothing is uploaded. The preflight above is the full"
+          echo "statement of what a real publish would do. To publish for real:"
+          echo "  1. resolve every preflight blocker in a reviewed commit"
+          echo "     (including declaring @mudraid/adapter-node as a real dependency),"
+          echo "  2. dispatch with publish=true,"
+          echo "  3. approve the npm-publish environment when prompted,"
+          echo "  4. record the upload receipt in sdks/support-matrix.json —"
+          echo "     the row flips on the receipt, not on this run going green."
+
+      # Publish THE artifact the other jobs proved — the downloaded tarball,
+      # never a rebuild. --provenance publishes a Sigstore attestation binding
+      # the tarball to this repository, workflow and run.
+      - name: Publish to npm (provenance)
+        if: inputs.publish == true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish "$(readlink -f dist-tarball/*.tgz)" --provenance --access public
+
+      - name: The receipt to record
+        if: inputs.publish == true
+        run: |
+          echo "Published. Now write the receipt into sdks/support-matrix.json:"
+          echo "  recorded_upload.version      = the version just uploaded"
+          echo "  recorded_upload.registry_url = https://www.npmjs.com/package/@mudraid/sidecar"
+          echo "  recorded_upload.uploaded_at  = $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "  recorded_upload.workflow     = this workflow, npm-publish environment approval"
+          echo "support_status flips from 'prerelease' in THAT commit — on the receipt, not the vibe."
