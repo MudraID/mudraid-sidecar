@@ -164,9 +164,10 @@ jobs:
 
       # `release: published` reaches here with no inputs, so every gate below
       # requires the explicit choice. With publish unset this step reports
-      # what a real run would refuse over — today that list includes the
-      # private flag, the 0.0.0 placeholder and the undeclared decision-core
-      # dependency — and refuses nothing.
+      # what a real run would refuse over — now that the manifest is public at
+      # 1.1.0, that list is the missing `repository` field (npm provenance
+      # requires it) and the undeclared decision-core dependency — and refuses
+      # nothing.
       - name: Preflight the release candidate
         env:
           PUBLISH_INTENT: ${{ inputs.publish == true }}

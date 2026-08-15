@@ -1,7 +1,7 @@
 {
   "name": "@mudraid/sidecar",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.1.0",
+  "private": false,
   "description": "Customer-hosted V2-enforcing reverse-proxy sidecar for MudraID. Reuses the @mudraid/adapter-node control loop as the decision core (EP-120-US-06, first slice).",
   "license": "Apache-2.0",
   "type": "module",

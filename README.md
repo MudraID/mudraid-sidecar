@@ -1,9 +1,23 @@
 # `@mudraid/sidecar` — customer-hosted enforcing sidecar
 
 A reverse-proxy sidecar that enforces MudraID **V2** in front of an upstream
-application, so an application on any language stack can be protected **without
-embedding a language-specific library**. This is the **first slice** of
-EP-120-US-06.
+**MCP server**, so an MCP server on any language stack can be protected
+**without embedding a language-specific library**. This is the **first slice**
+of EP-120-US-06.
+
+> **What V2 covers. Read this before configuring the sidecar.**
+>
+> MudraID V2 provides live action authorization for MCP Streamable HTTP tool
+> calls. MCP transport and session requests remain subject to the MCP server's
+> normal HTTP/OAuth authentication. For ordinary REST APIs, use MudraID's
+> route/scope middleware, which enforces the configured HTTP method and
+> route—including GET and DELETE.
+>
+> The V2 control loop treats `GET`/`HEAD`/`OPTIONS` as Streamable-HTTP transport
+> and `DELETE` as MCP session control, and calls `/decide` for neither. Fronting
+> an ordinary REST API with this sidecar therefore does not authorize its reads
+> and deletes. MCP control and discovery messages (`initialize`, `ping`,
+> `tools/list`) likewise pass without a `/decide` verdict.
 
 ## The non-negotiable property: no bypass
 
