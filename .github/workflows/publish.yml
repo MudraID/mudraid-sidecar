@@ -5,8 +5,8 @@ name: Publish
 # and npm counterpart of the PyPI publish.yml pattern shipped with the two
 # Python packages. Same shape throughout: lives in the monorepo, mirrored into
 # the public repository alongside the package; dry-run by default; the upload
-# sits behind the `npm-publish` environment approval; a requested publish with
-# no credential is a loud refusal, never a skip; and the support-matrix row
+# sits behind the `npm-publish` environment approval; a requested publish without
+# an OIDC identity is a loud refusal, never a skip; and the support-matrix row
 # flips only on a recorded upload receipt, never on this run going green.
 #
 # TWO CHANNELS, ONE VERSION. The support matrix lists this package on the
@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Actually upload to npm (requires the npm-publish environment approval and NPM_TOKEN). Anything else is a dry run."
+        description: "Actually upload to npm (requires the npm-publish environment approval and npm Trusted Publishing). Anything else is a dry run."
         required: false
         default: false
         type: boolean
@@ -129,13 +129,15 @@ jobs:
     environment: npm-publish
     permissions:
       contents: read
-      id-token: write # `npm publish --provenance` signs over the Actions OIDC identity
+      id-token: write # npm Trusted Publishing and provenance
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+      - name: Install the OIDC-capable publishing CLI
+        run: npm install --global npm@11.15.0
       - uses: actions/download-artifact@v4
         with:
           name: dist-tarball
@@ -147,17 +149,13 @@ jobs:
           PUBLISH_INTENT: ${{ inputs.publish == true }}
         run: node .github/inspect_tarball.mjs preflight dist-tarball
 
-      # ABSENCE OF THE CREDENTIAL IS A REFUSAL, NOT A SKIP. A green run with a
-      # quietly skipped upload reads as a release that never happened. The
-      # secret is only ever read into the environment — never echoed, never
-      # written to a file.
-      - name: Refuse a requested publish without a credential
+      # Check presence only; never print or persist the OIDC request credential.
+      # npm validates the configured repository/workflow/environment on publish.
+      - name: Require the Actions OIDC identity
         if: inputs.publish == true
-        env:
-          NPM_TOKEN_PRESENT: ${{ secrets.NPM_TOKEN != '' }}
         run: |
-          if [ "${NPM_TOKEN_PRESENT}" != "true" ]; then
-            echo "::error::publish=true was requested but the NPM_TOKEN secret is not configured in the npm-publish environment. This is a refusal, not a skip: provision a granular automation token scoped to @mudraid/sidecar (or npm OIDC trusted publishing) and re-run. Nothing was published."
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::Publishing requires GitHub Actions OIDC (id-token: write) and an npm Trusted Publisher for this repository, publish.yml, and npm-publish environment. Nothing was published."
             exit 1
           fi
 
@@ -176,10 +174,8 @@ jobs:
       # Publish THE artifact the other jobs proved — the downloaded tarball,
       # never a rebuild. --provenance publishes a Sigstore attestation binding
       # the tarball to this repository, workflow and run.
-      - name: Publish to npm (provenance)
+      - name: Publish to npm (OIDC and provenance)
         if: inputs.publish == true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish "$(readlink -f dist-tarball/*.tgz)" --provenance --access public
 
       - name: The receipt to record
