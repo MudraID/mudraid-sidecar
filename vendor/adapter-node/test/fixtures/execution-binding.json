@@ -1,0 +1,36 @@
+{
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"pay\",\"arguments\":{\"amount_minor\":1250,\"recipient\":\"caf\u00e9-\ud83d\ude00\"}}}",
+  "request": {
+    "schema_version": "2.0",
+    "presented_authorization": "Bearer synthetic-caller-token",
+    "surface": {
+      "platform_id": "platform-1",
+      "environment": "staging",
+      "canonical_resource_uri": "https://example.com/mcp"
+    },
+    "request": {
+      "transport": "mcp_streamable_http",
+      "http_method": "POST",
+      "path": "/mcp?region=eu"
+    },
+    "action": {
+      "action_key": "payments:send",
+      "action_version": 2,
+      "mapping_id": "mapping-1",
+      "mapping_revision": 3,
+      "required_scopes": [
+        "payments:write"
+      ]
+    },
+    "bundle": {
+      "version": 4,
+      "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "execution": {
+      "profile": "mudraid.execution.request/1",
+      "body_sha256": "d0c01e29f07d9e50d175d22d11c219cca81e0b37d26ef951c24ed4647727b370",
+      "content_type": "application/json"
+    }
+  },
+  "expected_digest": "3f211153ec6580c30e12919e8fe61a90afc68e3b3d37750a0128af34f4f1ca1f"
+}

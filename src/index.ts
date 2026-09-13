@@ -1,16 +1,7 @@
-/**
- * `@mudraid/sidecar` — customer-hosted V2-enforcing reverse-proxy sidecar
- * (EP-120-US-06, first slice).
- *
- * The sidecar sits in front of an upstream application and forwards a request
- * ONLY after a bound V2 allow, reusing the `@mudraid/adapter-node` control loop
- * as its decision core (never re-implementing it). Everything else deny-closes.
- *
- * DEFERRED remainders (see README): signed-config distribution + provenance
- * verification; the containment channel; ECS/Kubernetes reference deployments +
- * bypass-resistance topology tests; chaos/soak/resource-limit + network-bypass
- * suites; the real authenticated HTTP `/decide` client (injectable seam + fakes
- * only); cross-language sample apps; multi-arch image publish.
+/** MudraID MCP enforcing proxy. Shares the adapter decision core.
+ * Authenticated configuration and signed decisions are implemented;
+ * exact-request binding is implemented. Trusted business facts and deployment
+ * qualification remain open.
  */
 
 export { DEFAULT_MAX_BODY_BYTES, type SidecarConfig } from './config.js';
@@ -27,6 +18,8 @@ export { createSidecarServer, main } from './server.js';
 // Re-export the decision-core seam so sidecar embedders wire `/decide` and the
 // typed vocabulary from one place, against the exact same core the proxy uses.
 export {
+  HttpAuthority,
+  type AuthorityOptions,
   staticDecideClient,
   throwingDecideClient,
   type AdapterCode,

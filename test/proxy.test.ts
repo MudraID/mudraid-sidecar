@@ -66,6 +66,24 @@ function toolCallInbound(
 }
 
 describe('bound allow forwards exactly once with trusted context', () => {
+  it('forwards the evaluated snapshot even if the caller mutates input during authorization', async () => {
+    const inbound = toolCallInbound('issue_refund', {authorization: 'Bearer original'});
+    const originalBody = Buffer.from(inbound.body);
+    const {forward, calls} = spyForwarder();
+    const result = await enforce(inbound, {
+      config: baseConfig,
+      decide: async () => {
+        inbound.body.fill(32);
+        (inbound.headers as Record<string, string>)['authorization'] = 'Bearer changed';
+        return {status: 'allow', decisionId: 'snapshot-decision'};
+      },
+      forwardUpstream: forward,
+    });
+    expect(result.forwarded).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body).toEqual(originalBody);
+    expect(calls[0]!.headers['authorization']).toBe('Bearer original');
+  });
   it('forwards a mapped, authorized tool call to the upstream exactly once', async () => {
     const { forward, calls } = spyForwarder();
     const deps: ProxyDeps = {

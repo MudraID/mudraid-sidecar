@@ -18,6 +18,7 @@
 
 import {
   evaluateV2,
+  type HttpAuthority,
   shouldForward,
   type DecideClient,
   type Decision,
@@ -29,7 +30,9 @@ import type { UpstreamForwarder, UpstreamResponse } from './upstream.js';
 
 export interface ProxyDeps {
   readonly config: SidecarConfig;
-  /** Injectable `/decide` seam. Real authenticated HTTP client is DEFERRED. */
+  /** Verified live authority used by the standalone server. */
+  readonly authority?: HttpAuthority;
+  /** Injectable decision seam for embedded integrations and tests. */
   readonly decide: DecideClient;
   /** Injectable upstream forwarder — never called except on a bound allow. */
   readonly forwardUpstream: UpstreamForwarder;
@@ -92,8 +95,21 @@ export async function enforce(
   inbound: InboundRequest,
   deps: ProxyDeps,
 ): Promise<SidecarResponse> {
-  const facts = buildFacts(inbound, deps.config);
-  const decision = await evaluateV2(facts, deps.decide);
+  // Own the exact bytes and headers before awaiting authority. A caller must
+  // not change what reaches the application while its decision is in flight.
+  inbound = {...inbound, headers: Object.freeze({...inbound.headers}), body: Buffer.from(inbound.body)};
+  const snapshot = deps.authority?.bundle;
+  const config = deps.authority ? {
+    ...deps.config, protectedSurface: true, bundleActive: snapshot !== undefined,
+    actionMap: Object.fromEntries(Object.entries(snapshot?.actions ?? {}).map(([tool, action]) => [tool, String(action['action_key'])])),
+  } : deps.config;
+  const facts = buildFacts(inbound, config);
+  const decide = deps.authority ? () => deps.authority!.decide(facts.toolName ?? '', {
+    presentedAuthorization: Object.entries(inbound.headers).find(([name]) => name.toLowerCase() === 'authorization')?.[1] ?? '',
+    httpMethod: inbound.method, path: inbound.path, body: inbound.body,
+    contentType: Object.entries(inbound.headers).find(([name]) => name.toLowerCase() === 'content-type')?.[1] ?? '',
+  }, snapshot) : deps.decide;
+  const decision = await evaluateV2(facts, decide);
 
   if (!shouldForward(decision)) {
     // Deny / deny-closed: the forwarder is NOT called. The upstream is never

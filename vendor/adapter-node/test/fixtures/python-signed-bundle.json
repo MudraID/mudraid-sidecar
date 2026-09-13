@@ -1,0 +1,65 @@
+{
+  "producer": "platform-integration-service bundle_signature and bundle_compiler; synthetic private key discarded",
+  "keys": {
+    "python-fixture": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsiCAMQL8ajDfywkFv6Wq\nsj0QNKfs2UJsNdQ1vbIIC+St1MT+1yVV8WB5Bf3SVHtjckjT1hhM6JMRf5piTvhN\nfLwExDFpBtwC8Jmtcx8Y4KaG0xBOpC6JQonsDM+4w5hg92M7kiXTFGA2SxS9pHY1\nKfsnyBY/ur0B7swu/Y6Byq/BJKnuojPrWR8sDn6a6Q0o+/sVfT1rCRQ6k1PTfRPP\nK7yL+bklUek4nHbPziiLGzaiNyrKmrScqULMmwy+PpcFCiHVEiRy0kJ2j/z335I0\nedPQE7RqwxPyZ1hVtLNNwvmTg7TaBfbrU8PkiC9ETFkqkS0s5rfIdBG7wgdwqVkn\noQIDAQAB\n-----END PUBLIC KEY-----\n"
+  },
+  "binding": {
+    "platformId": "python-platform",
+    "environment": "staging",
+    "resource": "https://example.com/mcp"
+  },
+  "envelope": {
+    "schema_version": "1.0",
+    "bundle_version": 1,
+    "payload": {
+      "schema_version": "1.0",
+      "bundle_version": 1,
+      "content": {
+        "surface": {
+          "platform_id": "python-platform",
+          "environment": "staging",
+          "canonical_resource_uri": "https://example.com/mcp"
+        },
+        "evaluation": {
+          "mode": "live",
+          "on_timeout": "deny",
+          "on_error": "deny",
+          "on_unmapped_action": "deny",
+          "on_stale_bundle": "deny",
+          "forward": "once",
+          "decide_required": true,
+          "retry_forwarded_request": false
+        },
+        "matcher": {
+          "kind": "mcp_tool_exact",
+          "actions": [
+            {
+              "tool_name": "read",
+              "action_key": "tasks:read",
+              "action_version": 1,
+              "description": "caf\u00e9 \ud83d\ude00 \u007f"
+            }
+          ]
+        }
+      }
+    },
+    "payload_digest": "a48be3aa1fb5ce02946d4fa7b396b8aa42e663cb4b75ffb0743f2d03592814d5",
+    "signature_profile": "mudraid.bundle.signature/1",
+    "signature_algorithm": "RS256",
+    "signature_key_id": "python-fixture",
+    "signature_claims": {
+      "profile": "mudraid.bundle.signature/1",
+      "algorithm": "RS256",
+      "key_id": "python-fixture",
+      "payload_digest": "a48be3aa1fb5ce02946d4fa7b396b8aa42e663cb4b75ffb0743f2d03592814d5",
+      "bundle_version": 1,
+      "platform_id": "python-platform",
+      "environment": "staging",
+      "canonical_resource_uri": "https://example.com/mcp",
+      "issued_at": "2026-09-12T00:00:00+00:00",
+      "not_before": "2026-09-12T00:00:00+00:00",
+      "expires_at": "2026-10-12T00:00:00+00:00"
+    },
+    "signature_value": "c2pJA/gEn/T1WgUAitNZiI6E4hMZtFjWff0q2OUMimg8+8oVAJGOLqcZxhDqiYrUQcW4oDbRqJA7wundNFIYQ3Qnpeb+yJTf/k/OM3WquhMzGsfZXB9eoCxWc6xf0CG4Ooo6zZjwZ3n7Kb2b0Hz/D3Cp4vuyE1QwKJ0S4DwHtiKqFTPfbMsndbCMcwckoSJBIZnqFUcGAsrfy81vUuCAMOex3dcdijdcgkw2eCDGwc+eVc7bRAm8UJZglsSUwcroDvP4jA8+BL2oVEbTI+m4E6GEBVz3zG7O9mbh0s8MpYqOznFZbys+FiSYLHfpf5yWn8r57m3vpvU2bQaarU7jeQ=="
+  }
+}

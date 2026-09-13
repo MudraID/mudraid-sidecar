@@ -3,9 +3,12 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
-    "types": ["node"],
-
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -15,18 +18,26 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
-
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
-
     "baseUrl": ".",
     "paths": {
-      "@mudraid/adapter-node": ["../mudraid-adapter-node/src/index.ts"]
+      "@mudraid/adapter-node": [
+        "../mudraid-adapter-node/src/index.ts",
+        "./vendor/adapter-node/src/index.ts"
+      ],
+      "@mudraid/test-authority": [
+        "../mudraid-adapter-node/test/authorityFixtures.ts",
+        "./vendor/adapter-node/test/authorityFixtures.ts"
+      ]
     }
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": [
+    "src/**/*",
+    "test/**/*"
+  ]
 }

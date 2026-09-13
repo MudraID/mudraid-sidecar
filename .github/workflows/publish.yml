@@ -12,20 +12,11 @@ name: Publish
 # TWO CHANNELS, ONE VERSION. The support matrix lists this package on the
 # `oci` channel — the Dockerfile image built by adapter-release.yml is the
 # primary distribution — and this workflow governs the npm tarball, the
-# source-run form. Both carry the same package.json version; neither channel's
+# compiled runtime form. Both carry the same package.json version; neither channel's
 # row moves except on its own receipt.
 #
-# KNOWN RELEASE BLOCKER, STATED RATHER THAN PAPERED OVER. The sidecar consumes
-# `@mudraid/adapter-node` by RELATIVE SOURCE alias (vitest.config.ts and
-# tsconfig `paths` point at ../mudraid-adapter-node/src) and package.json
-# declares NO dependency on it. That wiring resolves only in the monorepo
-# layout: in a public mirror of this package alone, typecheck and the test
-# suite fail because the sibling directory is not there — and that failure is
-# a true statement, not a flake. Releasing to npm requires, in one reviewed
-# commit: publish @mudraid/adapter-node first, declare it as a real
-# dependency here, and retire the source aliases. Until then the preflight
-# below refuses a real publish over the undeclared import, by name.
-# ─────────────────────────────────────────────────────────────────────────────
+# The candidate bundles the reviewed decision-core source shipped in the
+# snapshot. No sibling checkout is required after installing the tarball.
 
 on:
   workflow_dispatch:
@@ -51,9 +42,7 @@ jobs:
         with:
           node-version: '20'
 
-      # There is no compile step — the sidecar runs from TypeScript source via
-      # tsx — so "build" here is the strictest static statement available
-      # (typecheck) plus packing the artifact every later job inspects.
+      # Build and pack the same compiled candidate inspected below.
       - name: Typecheck and pack
         run: |
           npm ci
@@ -80,12 +69,7 @@ jobs:
           name: dist-tarball
           path: dist-tarball/
 
-      # What is IN the artifact, which no test can tell you. For this package
-      # the expensive absence would be a boot-path module (`main` names source
-      # files directly), and the expensive presence would be the Dockerfile —
-      # the OCI channel's recipe does not belong inside the npm artifact — or
-      # anything credential-shaped. Node standard library only, nothing
-      # outside this package directory, because this runs in the mirror too.
+      # Inspect the compiled artifact downloaded from the build job.
       - name: Inspect what the tarball actually contains
         run: node .github/inspect_tarball.mjs contents dist-tarball
 
@@ -111,23 +95,18 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      # The suite includes the packaging guards (test/packaging.test.ts) and
-      # the corpus-no-bypass conformance tests. In the monorepo layout this
-      # passes; in a public mirror it fails on the unresolvable
-      # `@mudraid/adapter-node` source alias — deliberately not worked around,
-      # because a sidecar whose decision core cannot be resolved from the
-      # published tree has no business publishing (see header).
-      #
-      # There is intentionally NO install-the-tarball import smoke here yet:
-      # the artifact's `main` is TypeScript source importing an undeclared
-      # dependency, so the smoke test has nothing truthful to exercise until
-      # the dependency-wiring release act lands. The preflight refuses a real
-      # publish on exactly that ground; adding the smoke test belongs to the
-      # same commit that fixes the wiring.
       - name: Run the suite
         run: |
           npm ci
           npm test
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-tarball
+          path: dist-tarball/
+
+      - name: Qualify the installed compiled runtime
+        run: node .github/check_installed.mjs dist-tarball
 
       - name: Generate SBOM
         if: matrix.node-version == '20'
@@ -162,12 +141,7 @@ jobs:
           name: dist-tarball
           path: dist-tarball/
 
-      # `release: published` reaches here with no inputs, so every gate below
-      # requires the explicit choice. With publish unset this step reports
-      # what a real run would refuse over — now that the manifest is public at
-      # 1.1.0, that list is the missing `repository` field (npm provenance
-      # requires it) and the undeclared decision-core dependency — and refuses
-      # nothing.
+      # Publishing remains an explicit owner-approved action.
       - name: Preflight the release candidate
         env:
           PUBLISH_INTENT: ${{ inputs.publish == true }}
@@ -193,7 +167,7 @@ jobs:
           echo "Dry run: nothing is uploaded. The preflight above is the full"
           echo "statement of what a real publish would do. To publish for real:"
           echo "  1. resolve every preflight blocker in a reviewed commit"
-          echo "     (including declaring @mudraid/adapter-node as a real dependency),"
+          echo "     (including qualifying the bundled decision core),"
           echo "  2. dispatch with publish=true,"
           echo "  3. approve the npm-publish environment when prompted,"
           echo "  4. record the upload receipt in sdks/support-matrix.json —"

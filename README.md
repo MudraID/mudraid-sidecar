@@ -1,104 +1,57 @@
-# `@mudraid/sidecar` — customer-hosted enforcing sidecar
+# MudraID enforcing sidecar
 
-A reverse-proxy sidecar that enforces MudraID **V2** in front of an upstream
-**MCP server**, so an MCP server on any language stack can be protected
-**without embedding a language-specific library**. This is the **first slice**
-of EP-120-US-06.
+A customer-hosted reverse proxy for MCP Streamable HTTP servers. Protected tool calls require an active, verified configuration and a signed live authorization decision before the request is forwarded.
 
-> **What V2 covers. Read this before configuring the sidecar.**
->
-> MudraID V2 provides live action authorization for MCP Streamable HTTP tool
-> calls. MCP transport and session requests remain subject to the MCP server's
-> normal HTTP/OAuth authentication. For ordinary REST APIs, use MudraID's
-> route/scope middleware, which enforces the configured HTTP method and
-> route—including GET and DELETE.
->
-> The V2 control loop treats `GET`/`HEAD`/`OPTIONS` as Streamable-HTTP transport
-> and `DELETE` as MCP session control, and calls `/decide` for neither. Fronting
-> an ordinary REST API with this sidecar therefore does not authorize its reads
-> and deletes. MCP control and discovery messages (`initialize`, `ping`,
-> `tools/list`) likewise pass without a `/decide` verdict.
+MCP transport/session requests and control messages such as `initialize`, `ping` and `tools/list` do not receive a tool authorization decision. The upstream must enforce its normal HTTP/OAuth authentication for them. For ordinary REST APIs, use the route/scope middleware: this sidecar does not authorize REST GET or DELETE operations.
 
-## The non-negotiable property: no bypass
+## Runtime configuration
 
-A request reaches the upstream application **only after a bound V2 allow**.
-Everything else — no active bundle, `/decide` unavailable, unmapped action, a
-framing violation, an explicit deny — **deny-closes** and is never proxied. The
-enforcement path is in-line: there is exactly one call site that forwards to the
-upstream (`src/proxy.ts`), and it is unconditionally guarded by
-`shouldForward(decision)`. The design offers no path around it.
+Run the compiled package with Node 20 or later. No TypeScript runtime, development dependencies or sibling repository is required after installation.
 
-> **A sidecar beside a publicly reachable app is _installed_, not _enforcing_.**
-> The topology guarantee is the operator's responsibility: **direct network
-> access to the upstream must be restricted to the sidecar** (e.g. the upstream
-> binds loopback / a private network namespace; only the sidecar's port is
-> exposed). The sidecar enforces in-line; the network must make it the only way
-> in.
+Set all authority values together:
 
-An **unconfigured** sidecar is safe: with no real `/decide` client wired it runs
-a deny-closed `unconfigured` seam and with no active bundle it returns
-`ENFORCE_NO_VALID_BUNDLE` — it **denies**, it does not fail open.
+| Setting | Value |
+|---|---|
+| `MUDRAID_API_URL` | MudraID HTTPS origin |
+| `MUDRAID_ADAPTER_TOKEN` | Credential issued for this registered adapter; keep secret |
+| `MUDRAID_PLATFORM_ID` | Registered protected surface identifier |
+| `MUDRAID_ENVIRONMENT` | That surface's environment |
+| `MUDRAID_RESOURCE_URI` | Exact canonical protected resource URI |
+| `MUDRAID_UPSTREAM_URL` | Fixed HTTP(S) upstream origin; defaults to local port 8080 |
+| `PORT` | Listening port; defaults to 8000 |
 
-## How the adapter-node core is consumed
+The adapter credential identifies the enforcement point. The inbound caller's OAuth token identifies the caller; it cannot substitute for the adapter credential. Partial authority configuration fails startup. Without authority configuration, protected tool calls remain denied. Environment flags cannot activate a bundle.
 
-The V2 decision is **not re-implemented here**. The sidecar reuses the
-framework-neutral control loop from the sibling package
-`sdks/mudraid-adapter-node` (`evaluateV2`, the `DecideClient` seam, the typed
-closed-union vocabulary) as its decision core.
+Configuration refresh checks signed content, platform/environment/resource bindings, desired version/digest and validity. Decisions require a trusted signature, matching request decision identifier, action/configuration binding and an unexpired deadline. Authority failures deny protected calls. Decisions and upstream calls are not automatically retried.
 
-**Consumption method: relative source reference.** `@mudraid/adapter-node` is an
-unpublished, private local package, so instead of a real npm dependency +
-publish, the specifier `@mudraid/adapter-node` is aliased to that package's
-`src/index.ts`:
+Restrict direct access to the upstream so clients cannot bypass the proxy. A forward attempt is not proof that the application committed a business operation. An observed decision acknowledgement is likewise not an execution receipt.
 
-- **typecheck** — `tsconfig.json` `compilerOptions.paths`;
-- **tests / runtime** — `vitest.config.ts` `resolve.alias`, and `tsx` honours the
-  same tsconfig `paths`.
+## Build and test
 
-This keeps `npm ci && npm test` fully self-contained (no build of the core, no
-publish) while exercising the **exact same** decision code — never a copy — so
-the two packages cannot drift. The tests also reuse the core's pinned
-adapter-decision corpus by relative path (`test/corpus-no-bypass.test.ts`).
+From the sidecar source directory in the development repository or prepared public mirror:
 
-## Fail / degrade / restart / drain intent
-
-- **Fail closed.** Any evaluation that is not a bound allow denies; a thrown
-  `/decide` transport error is caught and deny-closed with no detail surfaced.
-- **Degrade closed.** `/decide` timeout / unreachable / unconfigured →
-  `503 ENFORCE_DECIDE_UNAVAILABLE`; a stale / missing bundle →
-  `503 ENFORCE_NO_VALID_BUNDLE`. Degradation never opens the upstream.
-- **Restart.** The sidecar is stateless per request; on restart it comes up
-  deny-closed until configured, so a restart window cannot leak an allow.
-- **Drain.** In-flight requests complete through the single guarded path; new
-  requests continue to be evaluated. (Graceful-drain wiring / connection
-  lifecycle hardening is a later slice.)
-
-## Develop
-
-```bash
+```sh
 npm ci
 npm run typecheck
 npm test
-# run locally (deny-closed until a real /decide client + bundle are configured):
+npm run build
 npm start
 ```
 
-## Build the image
+The build bundles the exact adapter source from the same checkout. A public mirror includes that reviewed source under `vendor/adapter-node`; it does not fetch a floating branch. The installed artifact contains compiled JavaScript, the adapter license and `dist/build-inputs.json` with source hashes. That inventory supplements, rather than replaces, signed release provenance.
 
-Build context is the **`sdks/` directory** (the parent), because the core is
-consumed by relative source reference:
+The release workflow packs once, inspects the tarball and tests an isolated installation on each supported Node release line. Publication still requires the protected environment approval. A successful local build does not establish publication or live qualification.
 
-```bash
+## Container
+
+From the development repository root:
+
+```sh
 docker build -f sdks/mudraid-sidecar/Dockerfile -t mudraid-sidecar sdks/
 ```
 
-## Deferred remainders (NOT in this slice)
+The image uses a build stage and runs compiled code as the unprivileged Node user. Its build context includes the reviewed adapter source. The public npm mirror does not include this repository-specific Docker recipe.
 
-- Signed-config distribution + provenance verification; live bundle activation.
-- The containment channel.
-- ECS / Kubernetes reference deployments + bypass-resistance topology tests.
-- Chaos / soak / resource-limit + network-bypass-attack suites.
-- The real authenticated HTTP `/decide` client (only the injectable seam +
-  in-memory fakes exist today).
-- Cross-language sample apps.
-- Multi-arch image **publish** (the image is build-valid; publishing is later).
+## Qualification still pending
+
+Exact body bytes, caller, HTTP target and action/configuration are now bound to the signed decision, and the sidecar forwards its owned authorized snapshot. Trusted business-fact profiles and policy projection remain unimplemented; the runtime must not be represented as proving independent business-state truth or a committed operation. Standalone installed-package checks also do not establish network bypass resistance, containment-channel convergence, graceful drain, chaos/soak behavior or multi-architecture publication. These require their respective runtime evidence before broader support claims.

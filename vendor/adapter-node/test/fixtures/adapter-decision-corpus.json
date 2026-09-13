@@ -1,0 +1,709 @@
+{
+  "contract_version": "mudraid.adapter.decision/1",
+  "fixtures": [
+    {
+      "id": "positive_allow_mapped_tool_decide_allow",
+      "category": "positive",
+      "description": "Mapped tools/call on a protected surface with a live /decide allow forwards.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "allow"
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "authorized",
+        "reason_tier": "authorization",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "positive_allow_strips_reserved_header",
+      "category": "positive",
+      "description": "Client-supplied x-mudraid-* header is stripped before evaluation; the request still allows.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "allow",
+        "reserved_headers_presented": [
+          "x-mudraid-decision-id",
+          "authorization"
+        ]
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "authorized",
+        "reason_tier": "authorization",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": [
+          "x-mudraid-decision-id"
+        ]
+      }
+    },
+    {
+      "id": "positive_control_verb_get_passes",
+      "category": "positive",
+      "description": "GET carries no JSON-RPC request and is classified control-plane; it passes through.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "GET"
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "control_plane_passthrough",
+        "reason_tier": "transport",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "positive_public_method_initialize_passes",
+      "category": "positive",
+      "description": "The allowlisted initialize control method passes without a tool decision.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "initialize"
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "control_plane_passthrough",
+        "reason_tier": "transport",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "positive_client_notification_passes",
+      "category": "positive",
+      "description": "A client notifications/* message carries no tool invocation and passes.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "notifications/progress"
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "notification_passthrough",
+        "reason_tier": "transport",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "positive_unprotected_surface_passthrough",
+      "category": "positive",
+      "description": "A non-bundled surface passes through untouched; nothing is stripped or decided.",
+      "facts": {
+        "protected": false,
+        "reserved_headers_presented": [
+          "x-mudraid-decision-id"
+        ]
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "surface_not_protected",
+        "reason_tier": "transport",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "boundary_tool_name_at_max_len",
+      "category": "boundary",
+      "description": "A tool name at exactly the 512-byte bound is a valid action name.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "action_mapped": true,
+        "decide": "allow"
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "authorized",
+        "reason_tier": "authorization",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "boundary_tool_name_over_max_len",
+      "category": "boundary",
+      "description": "A tool name one byte over the 512-byte bound is not a usable action name -> malformed.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "action_mapped": true,
+        "decide": "allow"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "malformed_request",
+        "reason_tier": "transport",
+        "http_status": 400,
+        "adapter_code": "ENFORCE_MALFORMED_REQUEST",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "boundary_empty_tool_name",
+      "category": "boundary",
+      "description": "An empty params.name is not a usable action name -> malformed, never a fallback.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "",
+        "action_mapped": true,
+        "decide": "allow"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "malformed_request",
+        "reason_tier": "transport",
+        "http_status": 400,
+        "adapter_code": "ENFORCE_MALFORMED_REQUEST",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "boundary_delete_control_verb_passes",
+      "category": "boundary",
+      "description": "DELETE (MCP session delete) is control-plane and passes through.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "DELETE"
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "control_plane_passthrough",
+        "reason_tier": "transport",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "boundary_public_method_tools_list_passes",
+      "category": "boundary",
+      "description": "tools/list discovery is allowlisted and passes without a tool decision.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/list"
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "control_plane_passthrough",
+        "reason_tier": "transport",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "boundary_decide_deny_explicit_reason",
+      "category": "boundary",
+      "description": "A /decide deny carrying an explicit registry deny reason is surfaced as that reason.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "deny",
+        "decide_reason": "amount_limit_exceeded"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "amount_limit_exceeded",
+        "reason_tier": "authorization",
+        "http_status": 403,
+        "adapter_code": "ENFORCE_DECISION_DENY",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_reserved_header_injection",
+      "category": "hostile",
+      "description": "Multiple spoofed x-mudraid-* trusted-context headers (mixed case) are all stripped.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "allow",
+        "reserved_headers_presented": [
+          "x-mudraid-decision-id",
+          "x-mudraid-action-key",
+          "X-MudraID-Bundle-Version",
+          "cookie"
+        ]
+      },
+      "expect": {
+        "outcome": "allow",
+        "reason_code": "authorized",
+        "reason_tier": "authorization",
+        "http_status": 200,
+        "adapter_code": null,
+        "stripped_reserved_headers": [
+          "x-mudraid-decision-id",
+          "x-mudraid-action-key",
+          "X-MudraID-Bundle-Version"
+        ]
+      }
+    },
+    {
+      "id": "hostile_no_bundle_fail_closed",
+      "category": "hostile",
+      "description": "No verified signed bundle active -> deny-closed 503, never implicit allow.",
+      "facts": {
+        "protected": true,
+        "bundle_active": false,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "allow"
+      },
+      "expect": {
+        "outcome": "not_safely_decided",
+        "reason_code": "adapter_config_stale",
+        "reason_tier": "authorization",
+        "http_status": 503,
+        "adapter_code": "ENFORCE_NO_VALID_BUNDLE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_batch_jsonrpc_rejected",
+      "category": "hostile",
+      "description": "A JSON-RPC batch (array body) is rejected wholesale, never partially evaluated.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "array"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "batch_unsupported",
+        "reason_tier": "transport",
+        "http_status": 400,
+        "adapter_code": "ENFORCE_BATCH_UNSUPPORTED",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_scalar_body_malformed",
+      "category": "hostile",
+      "description": "A non-object JSON body (scalar) is malformed on a protected surface.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "scalar"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "malformed_request",
+        "reason_tier": "transport",
+        "http_status": 400,
+        "adapter_code": "ENFORCE_MALFORMED_REQUEST",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_wrong_jsonrpc_version",
+      "category": "hostile",
+      "description": "jsonrpc other than '2.0' is malformed, never evaluated.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "1.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "malformed_request",
+        "reason_tier": "transport",
+        "http_status": 400,
+        "adapter_code": "ENFORCE_MALFORMED_REQUEST",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_non_post_method_denied",
+      "category": "hostile",
+      "description": "A non-control, non-POST verb on a protected surface denies (405).",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "PUT"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "method_not_allowed",
+        "reason_tier": "transport",
+        "http_status": 405,
+        "adapter_code": "ENFORCE_METHOD_NOT_ALLOWED",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_body_too_large_denied",
+      "category": "hostile",
+      "description": "An oversized body denies at the bounded-framing layer, never partial eval.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "body_too_large": true
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "body_too_large",
+        "reason_tier": "transport",
+        "http_status": 413,
+        "adapter_code": "ENFORCE_BODY_TOO_LARGE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_body_unreadable_denied",
+      "category": "hostile",
+      "description": "An unreadable body denies rather than being partially evaluated.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "body_readable": false
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "body_unreadable",
+        "reason_tier": "transport",
+        "http_status": 400,
+        "adapter_code": "ENFORCE_BODY_UNREADABLE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_message_not_allowed",
+      "category": "hostile",
+      "description": "A non-tools/call, non-allowlisted, non-notification method denies (403).",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "resources/subscribe"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "message_not_allowed",
+        "reason_tier": "transport",
+        "http_status": 403,
+        "adapter_code": "ENFORCE_MESSAGE_NOT_ALLOWED",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_resources_list_denied",
+      "category": "hostile",
+      "description": "resources/list is NOT a public method: resource enumeration on a protected surface is disclosure and denies (403) on every adapter. Pins the SSC-05 default.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "resources/list"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "message_not_allowed",
+        "reason_tier": "transport",
+        "http_status": 403,
+        "adapter_code": "ENFORCE_MESSAGE_NOT_ALLOWED",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_prompts_list_denied",
+      "category": "hostile",
+      "description": "prompts/list is NOT a public method: prompt enumeration on a protected surface is disclosure and denies (403) on every adapter. Pins the SSC-05 default.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "prompts/list"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "message_not_allowed",
+        "reason_tier": "transport",
+        "http_status": 403,
+        "adapter_code": "ENFORCE_MESSAGE_NOT_ALLOWED",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_unmapped_action_denied",
+      "category": "hostile",
+      "description": "A tools/call with no exact canonical mapping denies (403), never fuzzy-matched.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "unknown_tool",
+        "action_mapped": false
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "action_unmapped",
+        "reason_tier": "authorization",
+        "http_status": 403,
+        "adapter_code": "ENFORCE_ACTION_UNMAPPED",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_decide_timeout_deny_closed",
+      "category": "hostile",
+      "description": "/decide timeout is not-safely-decided -> deny-closed 503.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "timeout"
+      },
+      "expect": {
+        "outcome": "not_safely_decided",
+        "reason_code": "deadline_exceeded",
+        "reason_tier": "authorization",
+        "http_status": 503,
+        "adapter_code": "ENFORCE_DECIDE_UNAVAILABLE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_decide_error_deny_closed",
+      "category": "hostile",
+      "description": "/decide transport error is not-safely-decided -> deny-closed 503.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "error"
+      },
+      "expect": {
+        "outcome": "not_safely_decided",
+        "reason_code": "authority_source_unavailable",
+        "reason_tier": "authorization",
+        "http_status": 503,
+        "adapter_code": "ENFORCE_DECIDE_UNAVAILABLE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_decide_credential_unconfigured_deny_closed",
+      "category": "hostile",
+      "description": "/decide is a private authenticated route; a missing service secret is deny-closed, never anonymous.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "credential_unconfigured"
+      },
+      "expect": {
+        "outcome": "not_safely_decided",
+        "reason_code": "adapter_config_stale",
+        "reason_tier": "authorization",
+        "http_status": 503,
+        "adapter_code": "ENFORCE_DECIDE_UNAVAILABLE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_decide_unreachable_deny_closed",
+      "category": "hostile",
+      "description": "/decide is unreachable (connection refused / DNS failure) -> not-safely-decided, deny-closed 503; never optimistically allowed.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "unreachable"
+      },
+      "expect": {
+        "outcome": "not_safely_decided",
+        "reason_code": "authority_source_unavailable",
+        "reason_tier": "authorization",
+        "http_status": 503,
+        "adapter_code": "ENFORCE_DECIDE_UNAVAILABLE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_decide_unconfigured_deny_closed",
+      "category": "hostile",
+      "description": "The /decide endpoint URL itself is unconfigured on the adapter; a stale/absent configuration is deny-closed 503, never treated as allow.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "unconfigured"
+      },
+      "expect": {
+        "outcome": "not_safely_decided",
+        "reason_code": "adapter_config_stale",
+        "reason_tier": "authorization",
+        "http_status": 503,
+        "adapter_code": "ENFORCE_DECIDE_UNAVAILABLE",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_decide_deny_reason_not_deny_falls_back",
+      "category": "hostile",
+      "description": "A /decide deny that smuggles a non-deny reason code cannot leak; it falls back to policy_rule_denied.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": true,
+        "decide": "deny",
+        "decide_reason": "authorized"
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "policy_rule_denied",
+        "reason_tier": "authorization",
+        "http_status": 403,
+        "adapter_code": "ENFORCE_DECISION_DENY",
+        "stripped_reserved_headers": []
+      }
+    },
+    {
+      "id": "hostile_reserved_header_injection_stripped_on_deny",
+      "category": "hostile",
+      "description": "Client forges an x-mudraid-* trusted-context header on a request that will be DENIED (unmapped action). The header is stripped before evaluation regardless — trusted context is never accepted as an input fact, on any path.",
+      "facts": {
+        "protected": true,
+        "bundle_active": true,
+        "method": "POST",
+        "json_shape": "object",
+        "jsonrpc": "2.0",
+        "rpc_method": "tools/call",
+        "tool_name": "issue_refund",
+        "action_mapped": false,
+        "reserved_headers_presented": [
+          "x-mudraid-decision-id",
+          "authorization"
+        ]
+      },
+      "expect": {
+        "outcome": "deny",
+        "reason_code": "action_unmapped",
+        "reason_tier": "authorization",
+        "http_status": 403,
+        "adapter_code": "ENFORCE_ACTION_UNMAPPED",
+        "stripped_reserved_headers": [
+          "x-mudraid-decision-id"
+        ]
+      }
+    }
+  ]
+}

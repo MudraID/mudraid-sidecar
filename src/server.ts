@@ -5,18 +5,14 @@
  * (bounded body), runs enforcement, and writes back either the deny-closed
  * response or the proxied upstream response.
  *
- * DEFERRED remainders wired to safe defaults here:
- *   - the real authenticated HTTP `/decide` client — until it exists the sidecar
- *     runs with a deny-closed `unconfigured` seam, so an unconfigured sidecar
- *     DENIES every protected request (installed, not enforcing == deny-closed,
- *     never bypass);
- *   - signed-config distribution / provenance / live bundle activation —
- *     `bundleActive` comes from static env config for now.
+ * Complete authority settings enable authenticated configuration refresh and
+ * signed decisions. Missing settings leave protected traffic deny-closed;
+ * partial settings fail startup. Environment flags cannot activate a bundle.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
-import { staticDecideClient, type DecideClient } from '@mudraid/adapter-node';
+import { HttpAuthority, staticDecideClient, type DecideClient } from '@mudraid/adapter-node';
 
 import { DEFAULT_MAX_BODY_BYTES, type SidecarConfig } from './config.js';
 import { enforce, type ProxyDeps } from './proxy.js';
@@ -82,38 +78,72 @@ export function createSidecarServer(deps: ProxyDeps, maxBodyBytes: number) {
   });
 }
 
-function configFromEnv(): { config: SidecarConfig; port: number; maxBodyBytes: number } {
-  const maxBodyBytes = Number(process.env['MUDRAID_MAX_BODY_BYTES'] ?? DEFAULT_MAX_BODY_BYTES);
+function positiveInteger(
+  raw: string,
+  name: string,
+  maximum = Number.MAX_SAFE_INTEGER,
+): number {
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
+    // Never echo the supplied value: configuration may contain sensitive text.
+    throw new Error(
+      `${name} must be a positive integer within its supported range`,
+    );
+  }
+  return value;
+}
+
+export function configFromEnv(env: NodeJS.ProcessEnv = process.env): {
+  config: SidecarConfig;
+  port: number;
+  maxBodyBytes: number;
+} {
+  const maxBodyBytes = positiveInteger(
+    env['MUDRAID_MAX_BODY_BYTES'] ?? String(DEFAULT_MAX_BODY_BYTES),
+    'MUDRAID_MAX_BODY_BYTES',
+    8 * 1024 * 1024,
+  );
+  const port = positiveInteger(env['PORT'] ?? '8000', 'PORT', 65535);
   const config: SidecarConfig = {
-    upstreamBaseUrl: process.env['MUDRAID_UPSTREAM_URL'] ?? 'http://127.0.0.1:8080',
-    protectedSurface: process.env['MUDRAID_PROTECTED_SURFACE'] !== 'false',
-    // DEFERRED: real bundle verification. Default false ⇒ deny-closed until a
-    // verified bundle is configured active.
-    bundleActive: process.env['MUDRAID_BUNDLE_ACTIVE'] === 'true',
+    upstreamBaseUrl: env['MUDRAID_UPSTREAM_URL'] ?? 'http://127.0.0.1:8080',
+    protectedSurface: env['MUDRAID_PROTECTED_SURFACE'] !== 'false',
+    // Only authority verification can activate configuration; environment
+    // flags cannot substitute for a verified signed bundle.
+    bundleActive: false,
     actionMap: {},
     maxBodyBytes,
   };
-  return { config, port: Number(process.env['PORT'] ?? 8000), maxBodyBytes };
+  return { config, port, maxBodyBytes };
 }
 
-/** Boot the sidecar from environment configuration (deny-closed `/decide` seam). */
+/** No configuration assertion can substitute for signature verification. */
+export function authorityFromEnv(env: NodeJS.ProcessEnv = process.env): HttpAuthority | undefined {
+  const fields = ['MUDRAID_API_URL', 'MUDRAID_ADAPTER_TOKEN', 'MUDRAID_PLATFORM_ID', 'MUDRAID_ENVIRONMENT', 'MUDRAID_RESOURCE_URI'] as const;
+  if (!fields.some(field => env[field])) return undefined;
+  if (fields.some(field => !env[field]?.trim())) throw new Error('Incomplete sidecar authority configuration');
+  return new HttpAuthority({adapterType: 'node_sidecar', apiBase: env['MUDRAID_API_URL']!, adapterToken: env['MUDRAID_ADAPTER_TOKEN']!, binding: {
+    platformId: env['MUDRAID_PLATFORM_ID']!, environment: env['MUDRAID_ENVIRONMENT']!, resource: env['MUDRAID_RESOURCE_URI']!,
+  }});
+}
+
+/** Boot with public-key verification; an unconfigured authority stays denied. */
 export function main(): void {
   const { config, port, maxBodyBytes } = configFromEnv();
-  // DEFERRED: real authenticated HTTP `/decide` client. Deny-closed until wired.
+  const authority = authorityFromEnv();
   const decide: DecideClient = staticDecideClient({ status: 'unconfigured' });
   const deps: ProxyDeps = {
-    config,
-    decide,
+    config, decide, ...(authority ? {authority} : {}),
     forwardUpstream: httpUpstreamForwarder(config.upstreamBaseUrl),
   };
   const server = createSidecarServer(deps, maxBodyBytes);
+  server.requestTimeout = 30000;
+  server.headersTimeout = 10000;
+  const refresh = authority ? setInterval(() => { void authority.refresh(); }, 30000) : undefined;
+  refresh?.unref();
+  server.on('close', () => { if (refresh) clearInterval(refresh); });
+  if (authority) void authority.refresh();
   server.listen(port, () => {
-    // eslint-disable-next-line no-console
-    console.log(`mudraid-sidecar listening on :${port} → ${config.upstreamBaseUrl}`);
+    // Log no URLs or credential-bearing configuration.
+    console.log(`mudraid-sidecar listening on :${port}`);
   });
-}
-
-// Run when invoked directly (tsx src/server.ts).
-if (process.argv[1] !== undefined && import.meta.url === `file://${process.argv[1]}`) {
-  main();
 }

@@ -19,7 +19,7 @@
  * core contract.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -75,9 +75,12 @@ interface Corpus {
 
 // Relative reference into the adapter-node package's pinned corpus snapshot —
 // the same fixtures the core's own parity suite runs against.
-const corpusPath = fileURLToPath(
-  new URL('../../mudraid-adapter-node/test/fixtures/adapter-decision-corpus.json', import.meta.url),
-);
+const candidates = [
+  '../../mudraid-adapter-node/test/fixtures/adapter-decision-corpus.json',
+  '../vendor/adapter-node/test/fixtures/adapter-decision-corpus.json',
+].map(path => fileURLToPath(new URL(path, import.meta.url)));
+const corpusPath = candidates.find(path => existsSync(path));
+if (!corpusPath) throw new Error('Pinned decision corpus is missing');
 const corpus = JSON.parse(readFileSync(corpusPath, 'utf-8')) as Corpus;
 
 const OK_UPSTREAM: UpstreamResponse = {

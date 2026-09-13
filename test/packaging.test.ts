@@ -11,7 +11,7 @@
  *
  * NOTE ON CHANNELS: the support matrix lists this package on the `oci`
  * channel — the Dockerfile image is the primary distribution — and the npm
- * tarball is the source-run form the publish workflow governs. The version is
+ * tarball is the compiled runtime form the publish workflow governs. The version is
  * one fact either way: the matrix row's version tracks package.json.
  */
 
@@ -89,10 +89,9 @@ describe('packaging metadata', () => {
   });
 
   it('points the entry surface inside the files allowlist', () => {
-    // There is no build step: `main` names TypeScript source and the runtime
-    // is `tsx src/server.ts`, so the allowlist must carry the whole of src/.
+    // Customer entry points must resolve inside the compiled artifact.
     const allow: string[] = manifest.files;
-    expect(allow).toContain('src');
+    expect(allow).toContain('dist');
     const rel = (manifest.main as string).replace(/^\.\//, '');
     expect(
       allow.some((prefix) => rel === prefix || rel.startsWith(`${prefix}/`)),
@@ -100,7 +99,7 @@ describe('packaging metadata', () => {
     ).toBe(true);
   });
 
-  it('packs the runnable source and none of the forbidden classes', () => {
+  it('packs the compiled standalone runtime and none of the forbidden classes', () => {
     const out = execFileSync('npm', ['pack', '--dry-run', '--json'], {
       cwd: PACKAGE_ROOT,
       encoding: 'utf8',
@@ -108,7 +107,7 @@ describe('packaging metadata', () => {
     });
     const files: string[] = JSON.parse(out)[0].files.map((f: any) => f.path);
 
-    for (const required of ['package.json', 'README.md', 'src/index.ts', 'src/server.ts']) {
+    for (const required of ['package.json', 'README.md', 'dist/index.js', 'dist/server.js', 'dist/build-inputs.json', 'dist/ADAPTER-LICENSE']) {
       expect(files).toContain(required);
     }
 

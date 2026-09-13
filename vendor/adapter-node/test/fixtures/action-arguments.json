@@ -1,0 +1,28 @@
+{
+  "profile": {
+    "schema_version": "mudraid.action.arguments/1",
+    "fields": [
+      {
+        "name": "amount_minor",
+        "parameter": "amount_minor",
+        "type": "integer",
+        "source": "request",
+        "required": true,
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      {
+        "name": "recipient",
+        "parameter": "recipient",
+        "type": "string",
+        "source": "request",
+        "required": true,
+        "max_length": 128
+      }
+    ]
+  },
+  "expected": {
+    "amount_minor": 1250,
+    "recipient": "caf\u00e9-\ud83d\ude00"
+  }
+}

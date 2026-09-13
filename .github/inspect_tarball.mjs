@@ -10,8 +10,8 @@
  * ever opens the archive and looks, so a distribution can be wrong in two
  * directions while everything stays green:
  *
- *   - A file that should ship and does not. `src/server.ts` is this package's
- *     example: the sidecar runs from its TypeScript source (`tsx src/server.ts`,
+ *   - A file that should ship and does not. `dist/server.js` is this package's
+ *     example: the sidecar runs from compiled JavaScript (`node dist/server.js`,
  *     see README), every in-tree test passes without the `files` allowlist
  *     being right, and the first person to notice a missing module is the
  *     customer whose sidecar fails to boot.
@@ -44,12 +44,11 @@ const PACKAGE_NAME = '@mudraid/sidecar';
 /** What must be in the tarball — the thing `npm install` actually delivers. */
 const REQUIRED = [
   'package/package.json',
-  // There is no build step: the manifest's `main` points at the TypeScript
-  // source and the runtime is `tsx src/server.ts` (README, "Run"). Every
-  // module the boot path needs must therefore ship as source; the two named
-  // here are the entry surface and the server it starts.
-  'package/src/index.ts',
-  'package/src/server.ts',
+  // Plain Node entry points and bundled-source inventory.
+  'package/dist/index.js',
+  'package/dist/server.js',
+  'package/dist/build-inputs.json',
+  'package/dist/ADAPTER-LICENSE',
   // The README is the operator's runbook for a customer-hosted proxy. npm
   // packs a root README unconditionally, so its absence here means the
   // `files` allowlist broke that rule somehow — worth refusing over.
@@ -78,7 +77,7 @@ const FORBIDDEN = [
   // The Dockerfile builds the OCI distribution of this sidecar — a different
   // channel with its own lane (adapter-release.yml). Same rule as the Kong
   // mirror's exclusions: WHOSE ARTIFACT IS THIS? The npm tarball is the
-  // source-run form, and shipping the image recipe inside it blurs which
+  // compiled runtime form, and shipping the image recipe inside it blurs which
   // artifact a customer is holding.
   [/(^|\/)Dockerfile$/, 'the OCI channel’s build recipe, not part of the npm artifact'],
 ];
@@ -188,7 +187,7 @@ function checkContents(distDir) {
 
   if (problems.length) process.exit(fail(problems));
   console.log(
-    `inspect_tarball: ${tgz} carries the runnable source and its README, and ` +
+    `inspect_tarball: ${tgz} carries the compiled runtime and its README, and ` +
       `nothing from the ${FORBIDDEN.length} forbidden classes.`,
   );
 }
