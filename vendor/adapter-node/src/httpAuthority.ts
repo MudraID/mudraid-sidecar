@@ -141,9 +141,12 @@ export class HttpAuthority {
       const bound = bindExecution(snapshot, mapped, context);
       const response = await this.request('decide', 'POST', {
         schema_version: 'mudraid.enforce.decide-request/1', decision_id: decisionId,
-        adapter: {type: this.adapterType, version: '1.1.0'},
+        adapter: {type: this.adapterType, version: '1.1.1'},
         bundle: {version: snapshot.version, payload_digest: snapshot.digest},
-        surface: snapshot.surface, action: mapped,
+        // Bundle display metadata is not part of the strict decision contract.
+        surface: {platform_id: snapshot.surface['platform_id'],
+          environment: snapshot.surface['environment'],
+          canonical_resource_uri: snapshot.surface['canonical_resource_uri']}, action: mapped,
         request: {transport: 'mcp_streamable_http', http_method: context.httpMethod, path: context.path},
         presented_authorization: context.presentedAuthorization, execution: bound.execution,
       });

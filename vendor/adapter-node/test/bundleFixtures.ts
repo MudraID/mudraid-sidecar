@@ -8,7 +8,7 @@ export const binding = {platformId: 'platform', environment: 'staging', resource
 export const now = Date.parse('2026-09-12T00:00:00Z');
 export function bundle(version = 1, moment = now, withArguments = false) {
   const payload = {schema_version: '1.0', bundle_version: version, content: {
-    surface: {platform_id: binding.platformId, environment: binding.environment, canonical_resource_uri: binding.resource},
+    surface: {domain: 'example.com', platform_id: binding.platformId, environment: binding.environment, canonical_resource_uri: binding.resource},
     evaluation: {mode: 'live', on_timeout: 'deny', on_error: 'deny', on_unmapped_action: 'deny', on_stale_bundle: 'deny', forward: 'once', decide_required: true, retry_forwarded_request: false},
     matcher: {kind: 'mcp_tool_exact', actions: [{tool_name: 'read', action_key: 'tasks:read', action_version: 1, mapping_id: 'mapping-1', mapping_revision: 1, required_scopes: ['tasks:read'], ...(withArguments ? {argument_profile: argumentFixture.profile} : {})}]},
   }};

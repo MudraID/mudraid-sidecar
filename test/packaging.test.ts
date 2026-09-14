@@ -59,7 +59,7 @@ describe('version single-source', () => {
     // test — never a drive-by edit that two of the four fail to notice.
     const row = matrixRow('@mudraid/sidecar');
     expect(manifest.version).toBe(row.version);
-    expect(manifest.version).toBe('1.1.0');
+    expect(manifest.version).toBe('1.1.1');
   });
 
   it('keeps the lockfile agreeing with the manifest', () => {
