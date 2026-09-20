@@ -45,7 +45,8 @@ jobs:
       # Build and pack the same compiled candidate inspected below.
       - name: Typecheck and pack
         run: |
-          npm ci
+          npm audit --package-lock-only --audit-level=high
+          npm ci --ignore-scripts
           npm run typecheck
           mkdir -p dist-tarball
           npm pack --pack-destination dist-tarball
