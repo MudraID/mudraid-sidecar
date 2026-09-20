@@ -141,7 +141,7 @@ export class HttpAuthority {
       const bound = bindExecution(snapshot, mapped, context);
       const response = await this.request('decide', 'POST', {
         schema_version: 'mudraid.enforce.decide-request/1', decision_id: decisionId,
-        adapter: {type: this.adapterType, version: '1.1.1'},
+        adapter: {type: this.adapterType, version: '1.1.2'},
         bundle: {version: snapshot.version, payload_digest: snapshot.digest},
         // Bundle display metadata is not part of the strict decision contract.
         surface: {platform_id: snapshot.surface['platform_id'],
@@ -154,7 +154,7 @@ export class HttpAuthority {
       const now = Date.now();
       const decidedAt = instant(response['decided_at']);
       if (decidedAt > now + 30000 || now - decidedAt > 60000) throw new Error('Stale decision');
-      if (instant(response['deadline_at']) <= now) throw new Error('Expired decision');
+      const deadline = instant(response['deadline_at']);
       // This new runtime always requires signed decisions; there is no downgrade toggle.
       const signature = object(response['signature']);
       const claims = object(signature['claims']);
@@ -174,6 +174,9 @@ export class HttpAuthority {
       if (instant(claims['not_before']) > now + 30000 || instant(claims['expires_at']) <= now) throw new Error('Invalid decision window');
       if (snapshot !== this.bundle) throw new Error('Bundle changed during decision');
       if (response['decision'] !== 'allow' && response['decision'] !== 'deny') throw new Error('Invalid decision outcome');
+      // Classify expiry only after signature and request binding verification.
+      // Recheck the clock after verification; never forward or retry this attempt.
+      if (deadline <= Date.now()) return {status: 'expired'};
       // Observation is a verified decision, not proof that the application
       // executed it. Report on the next refresh without delaying execution or
       // replaying a decision. Keep at most one bundle's observation in memory.

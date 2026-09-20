@@ -65,6 +65,7 @@ const DEFAULT_PUBLIC_METHODS: ReadonlySet<string> = new Set([
  * code is uniformly `ENFORCE_DECIDE_UNAVAILABLE`.
  */
 const DECIDE_UNAVAILABLE_REASONS: Readonly<Record<string, string>> = {
+  expired: 'deadline_exceeded',
   timeout: 'deadline_exceeded',
   error: 'authority_source_unavailable',
   unreachable: 'authority_source_unavailable',
@@ -369,6 +370,18 @@ export async function evaluateV2(facts: RequestFacts, decide: DecideClient): Pro
       'ENFORCE_DECISION_DENY',
       'the authority denied this action',
       stripped,
+    );
+  }
+
+  if (result.status === 'expired') {
+    return deny(
+      'deadline_exceeded',
+      'authorization',
+      503,
+      'ENFORCE_DECIDE_UNAVAILABLE',
+      'Authorization expired before this request could be forwarded. This attempt was not forwarded. Obtain fresh authorization before retrying; do not automatically retry operations that may already have executed in another attempt.',
+      stripped,
+      'not_safely_decided',
     );
   }
 
