@@ -1,6 +1,6 @@
 {
   "name": "@mudraid/sidecar",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": false,
   "description": "Customer-hosted MudraID enforcement proxy with authenticated configuration and signed decisions.",
   "license": "Apache-2.0",
@@ -21,11 +21,11 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@types/node": "20.17.9",
-    "tsx": "4.19.2",
+    "@types/node": "20.19.43",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
     "typescript": "5.6.3",
-    "vitest": "2.1.8",
-    "esbuild": "0.23.1"
+    "vitest": "4.1.11"
   },
   "exports": {
     ".": "./dist/index.js"

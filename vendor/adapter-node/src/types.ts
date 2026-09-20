@@ -53,6 +53,7 @@ export type AdapterCode =
  * control loop.
  *
  *  - `allow` / `deny` — an authority decision was reached;
+ *  - `expired` — a verified decision arrived after its deadline; do not execute;
  *  - `timeout` / `error` / `unreachable` / `unconfigured` /
  *    `credential_unconfigured` — the call could not be completed; every one is
  *    deny-closed (`not_safely_decided`), never optimistically allowed.
@@ -60,6 +61,7 @@ export type AdapterCode =
 export type DecideStatus =
   | 'allow'
   | 'deny'
+  | 'expired'
   | 'timeout'
   | 'error'
   | 'unreachable'

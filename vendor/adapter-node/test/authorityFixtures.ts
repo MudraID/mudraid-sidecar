@@ -39,6 +39,7 @@ export function harness(mode = 'allow', onDecide?: () => void, withArguments = f
       not_before: new Date(Date.now() - 1000).toISOString(), expires_at: new Date(Date.now() + 5000).toISOString()};
     if (mode !== 'unsigned') response.signature = {profile: claims.profile, algorithm: 'RS256', key_id: 'decision1', claims, signature: sign('RSA-SHA256', Buffer.from(canonicalJson(claims)), privateKey).toString('base64')};
     if (mode === 'replayed') response.decision_id = 'a-different-request';
+    if (mode === 'forged_expired_deadline') response.deadline_at = new Date(Date.now() - 1000).toISOString();
     if (mode === 'altered') response.decision = 'deny';
     return Response.json(response);
   };

@@ -55,3 +55,15 @@ The image uses a build stage and runs compiled code as the unprivileged Node use
 ## Qualification still pending
 
 Exact body bytes, caller, HTTP target and action/configuration are now bound to the signed decision, and the sidecar forwards its owned authorized snapshot. Trusted business-fact profiles and policy projection remain unimplemented; the runtime must not be represented as proving independent business-state truth or a committed operation. Standalone installed-package checks also do not establish network bypass resistance, containment-channel convergence, graceful drain, chaos/soak behavior or multi-architecture publication. These require their respective runtime evidence before broader support claims.
+
+
+### Authorization expires before forwarding
+
+A verified decision that arrives after its deadline is refused with HTTP 503,
+`ENFORCE_DECIDE_UNAVAILABLE`, and reason `deadline_exceeded`. The message explains
+that authorization expired and this attempt was not forwarded. This differs
+from an unreachable authority; it does not mean that permission was denied.
+The adapter does not automatically retry. A deliberate retry must obtain a fresh
+decision. Use application-level idempotency for operations that could already
+have executed in an earlier attempt; this error makes no claim about those
+other attempts. Never reuse an expired decision or disable expiry validation.

@@ -4,7 +4,7 @@ import {harness} from '@mudraid/test-authority';
 import {enforce} from '../src/proxy.js';
 
 describe('verified authority through the proxy', () => {
-  it.each(['allow', 'deny', 'unsigned', 'replayed', 'altered', 'foreign_action', 'expired_deadline', 'missing_deadline', 'foreign_body', 'missing_execution', 'unreachable', 'tampered'])(
+  it.each(['allow', 'deny', 'unsigned', 'replayed', 'altered', 'foreign_action', 'forged_expired_deadline', 'expired_deadline', 'missing_deadline', 'foreign_body', 'missing_execution', 'unreachable', 'tampered'])(
     'forwards exactly once only for a verified allow: %s', async mode => {
       const {authority, calls} = harness(mode);
       await authority.refresh();
@@ -21,6 +21,18 @@ describe('verified authority through the proxy', () => {
         forwardUpstream: forward,
       });
       expect(result.forwarded).toBe(mode === 'allow');
+      if (mode === 'expired_deadline') {
+        const payload = JSON.parse(result.body.toString('utf-8'));
+        expect(result.status).toBe(503);
+        expect(payload.reason).toBe('deadline_exceeded');
+        expect(payload.message).toContain('Authorization expired');
+        expect(payload.message).toContain('This attempt was not forwarded');
+        expect(calls.filter(c => c.path === 'decide')).toHaveLength(1);
+      }
+      if (mode === 'forged_expired_deadline') {
+        expect(JSON.parse(result.body.toString('utf-8')).message).not.toContain('Authorization expired');
+      }
+
       expect(forward).toHaveBeenCalledTimes(mode === 'allow' ? 1 : 0);
       expect(calls.filter(c => c.path === 'decide').length).toBeLessThanOrEqual(1);
       if (mode === 'allow') {

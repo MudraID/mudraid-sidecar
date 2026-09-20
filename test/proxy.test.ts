@@ -233,3 +233,23 @@ describe('deny response body carries only typed, secret-free fields', () => {
     expect(typeof payload['message']).toBe('string');
   });
 });
+
+
+it('explains expired authorization and never forwards or automatically retries', async () => {
+  const forward = forbiddenForwarder();
+  const decide = vi.fn(staticDecideClient({status: 'expired'}));
+  const result = await enforce(toolCallInbound('issue_refund'), {
+    config: baseConfig, decide, forwardUpstream: forward,
+  });
+  expect(result.status).toBe(503);
+  expect(result.forwarded).toBe(false);
+  expect(forward).not.toHaveBeenCalled();
+  expect(decide).toHaveBeenCalledTimes(1);
+  const payload = JSON.parse(result.body.toString('utf-8'));
+  expect(payload.code).toBe('ENFORCE_DECIDE_UNAVAILABLE');
+  expect(payload.reason).toBe('deadline_exceeded');
+  expect(payload.message).toContain('Authorization expired');
+  expect(payload.message).toContain('This attempt was not forwarded');
+  expect(payload.message).toContain('Obtain fresh authorization');
+  expect(payload.message).not.toContain('could not be reached');
+});

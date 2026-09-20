@@ -1,6 +1,6 @@
 {
   "name": "@mudraid/adapter-node",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": false,
   "description": "Framework-neutral TypeScript/Node server adapter implementing the portable MudraID adapter-decision V2 control loop (EP-120-US-05, first slice).",
   "license": "Apache-2.0",
@@ -27,9 +27,9 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@types/node": "20.17.9",
+    "@types/node": "20.19.43",
     "typescript": "5.6.3",
-    "vitest": "2.1.8"
+    "vitest": "4.1.11"
   },
   "repository": {
     "type": "git",
